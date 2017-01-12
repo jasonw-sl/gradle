@@ -111,6 +111,10 @@ public class DefaultBuildCacheKeyBuilder implements BuildCacheKeyBuilder {
         return new DefaultBuildCacheKey(hashCode);
     }
 
+    public HashCode buildHashCode() {
+        return hasher.hash();
+    }
+
     private static class DefaultBuildCacheKey implements BuildCacheKey {
 
         private final HashCode hashCode;
@@ -201,7 +205,7 @@ public class DefaultBuildCacheKeyBuilder implements BuildCacheKeyBuilder {
         return this;
     }
 
-    private static class ByteArrayToStringer {
+    public static class ByteArrayToStringer {
         private static final char[] HEX_DIGITS = "01234567890abcdef".toCharArray();
         private final byte[] bytes;
         private final int offset;

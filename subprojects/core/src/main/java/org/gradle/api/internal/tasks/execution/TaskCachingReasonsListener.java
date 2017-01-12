@@ -19,6 +19,16 @@ package org.gradle.api.internal.tasks.execution;
 import org.gradle.api.Task;
 
 public interface TaskCachingReasonsListener {
+    class Empty implements TaskCachingReasonsListener {
+        @Override
+        public void cachingNotEnabled(Task task) {
+        }
+
+        @Override
+        public void notCacheable(String reason, Task task) {
+        }
+    }
+
     void cachingNotEnabled(Task task);
 
     void notCacheable(String reason, Task task);

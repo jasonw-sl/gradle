@@ -19,6 +19,7 @@ package org.gradle.api.internal.tasks.execution;
 import org.gradle.api.GradleException;
 import org.gradle.api.internal.TaskInternal;
 import org.gradle.api.internal.changedetection.TaskArtifactStateRepository;
+import org.gradle.api.internal.changedetection.state.TaskCacheKeyCalculator;
 import org.gradle.api.internal.tasks.TaskExecuter;
 import org.gradle.api.internal.tasks.TaskExecutionContext;
 import org.gradle.api.internal.tasks.TaskStateInternal;
@@ -37,10 +38,11 @@ public class VerifyNoInputChangesTaskExecuter implements TaskExecuter {
 
     @Override
     public void execute(TaskInternal task, TaskStateInternal state, TaskExecutionContext context) {
-        BuildCacheKey beforeExecution = context.getTaskArtifactState().calculateCacheKey();
+        TaskCacheKeyCalculator taskCacheKeyCalculator = new TaskCacheKeyCalculator(new TaskCacheHashesListener.Empty());
+        BuildCacheKey beforeExecution = taskCacheKeyCalculator.calculate(context.getTaskArtifactState().getCurrentExecution(), task);
         delegate.execute(task, state, context);
         if (beforeExecution != null) {
-            BuildCacheKey afterExecution = repository.getStateFor(task).calculateCacheKey();
+            BuildCacheKey afterExecution = taskCacheKeyCalculator.calculate(repository.getStateFor(task).getCurrentExecution(), task);
             if (afterExecution == null || !beforeExecution.getHashCode().equals(afterExecution.getHashCode())) {
                 throw new TaskExecutionException(task, new GradleException("The inputs for the task changed during the execution! Check if you have a `doFirst` changing the inputs."));
             }

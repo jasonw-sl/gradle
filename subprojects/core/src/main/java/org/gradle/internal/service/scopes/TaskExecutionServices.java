@@ -60,13 +60,16 @@ import org.gradle.api.internal.tasks.execution.SkipEmptySourceFilesTaskExecuter;
 import org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter;
 import org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter;
 import org.gradle.api.internal.tasks.execution.SkipUpToDateTaskExecuter;
+import org.gradle.api.internal.tasks.execution.TaskCacheHashesListener;
 import org.gradle.api.internal.tasks.execution.TaskCachingReasonsListener;
 import org.gradle.api.internal.tasks.execution.TaskOutputsGenerationListener;
 import org.gradle.api.internal.tasks.execution.ValidatingTaskExecuter;
 import org.gradle.api.internal.tasks.execution.VerifyNoInputChangesTaskExecuter;
 import org.gradle.api.invocation.Gradle;
 import org.gradle.cache.CacheRepository;
+import org.gradle.caching.BuildCacheKey;
 import org.gradle.caching.internal.BuildCacheConfigurationInternal;
+import org.gradle.caching.internal.DefaultBuildCacheKeyBuilder;
 import org.gradle.caching.internal.tasks.GZipTaskOutputPacker;
 import org.gradle.caching.internal.tasks.OutputPreparingTaskOutputPacker;
 import org.gradle.caching.internal.tasks.TarTaskOutputPacker;
@@ -146,6 +149,7 @@ public class TaskExecutionServices {
     private static TaskExecuter createSkipCachedExecuterIfNecessary(StartParameter startParameter, BuildCacheConfigurationInternal buildCacheConfiguration, TaskOutputPacker packer, TaskOutputsGenerationListener taskOutputsGenerationListener, TaskOutputOriginFactory taskOutputOriginFactory, ListenerManager listenerManager, TaskExecuter delegate) {
         if (startParameter.isTaskOutputCacheEnabled()) {
             TaskCachingReasonsListener cachingReasonsListener = listenerManager.getBroadcaster(TaskCachingReasonsListener.class);
+            TaskCacheHashesListener cacheHashesListener = listenerManager.getBroadcaster(TaskCacheHashesListener.class);
             listenerManager.addListener(new TaskCachingReasonsListener() {
                 @Override
                 public void cachingNotEnabled(Task task) {
@@ -157,7 +161,36 @@ public class TaskExecutionServices {
                     LOGGER.warn("Task {} is not cacheable: {}", task.getPath(), reason);
                 }
             });
-            return new SkipCachedTaskExecuter(taskOutputOriginFactory, buildCacheConfiguration, packer, taskOutputsGenerationListener, delegate, cachingReasonsListener);
+            listenerManager.addListener(new TaskCacheHashesListener() {
+                private String hashCodeToString(byte[] hashCode) {
+                    return new DefaultBuildCacheKeyBuilder.ByteArrayToStringer(hashCode).toString();
+                }
+                @Override
+                public void taskCacheKey(BuildCacheKey key, Task task) {
+                    LOGGER.warn("Cache key for task {} is {}", task.getPath(), key.getHashCode());
+                }
+
+                @Override
+                public void propertyHash(String propertyName, byte[] hash, Task task) {
+                    LOGGER.warn("Hash for cache key for property {} of task {} is {}", propertyName, task.getPath(), hashCodeToString(hash));
+                }
+
+                @Override
+                public void taskClassloaderHash(byte[] hash, Task task) {
+                    LOGGER.warn("Hash for task classloader of task {} is {}", task.getPath(), hashCodeToString(hash));
+                }
+
+                @Override
+                public void taskActionsClassloaderHash(byte[] hash, Task task) {
+                    LOGGER.warn("Hash for task action classloader of task {} is {}", task.getPath(), hashCodeToString(hash));
+                }
+
+                @Override
+                public void outputPropertyName(String name, Task task) {
+                    LOGGER.warn("Output property {} of task {}", name, task.getPath());
+                }
+            });
+            return new SkipCachedTaskExecuter(taskOutputOriginFactory, buildCacheConfiguration, packer, taskOutputsGenerationListener, delegate, cachingReasonsListener, cacheHashesListener);
         } else {
             return delegate;
         }
